@@ -74,4 +74,21 @@ public class AuthenticateController : Controller
 
         return Unauthorized();
     }
+
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        var authorizationHeader = Request.Headers[HeaderNames.Authorization];
+
+        var result = AuthenticationHeaderValue.TryParse(authorizationHeader, out var authorizationValue);
+
+        if (result)
+        {
+            var sessionToken = authorizationValue.Parameter;
+
+            _authenticateService.Logout(sessionToken);
+        }
+
+        return Ok(result);
+    }
 }

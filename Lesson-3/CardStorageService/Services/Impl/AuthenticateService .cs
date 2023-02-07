@@ -71,6 +71,36 @@ public class AuthenticateService : IAuthenticateService
         };
     }
 
+    public bool Logout(string sessionToken)
+    {
+        if (string.IsNullOrEmpty(sessionToken))
+        {
+            return false;
+        }
+
+        lock (_sessions)
+        {
+            _sessions.Remove(sessionToken);
+        }
+
+        using IServiceScope scope = _serviceScopeFactory.CreateScope();
+        CardStorageServiceDbContext context = scope.ServiceProvider.GetRequiredService<CardStorageServiceDbContext>();
+
+        AccountSession session = context.AccountSessions.FirstOrDefault(item => item.SessionToken == sessionToken);
+
+        if (session is null)
+        {
+            return true;
+        }
+
+        session.IsClosed = true;
+
+        context.AccountSessions.Update(session);
+        context.SaveChanges();
+
+        return true;
+    }
+
     public SessionDto GetSession(string sessionToken)
     {
         SessionDto sessionDto;
@@ -87,7 +117,7 @@ public class AuthenticateService : IAuthenticateService
 
             AccountSession session = context.AccountSessions.FirstOrDefault(item => item.SessionToken == sessionToken);
 
-            if (session == null)
+            if (session == null || session.IsClosed)
             {
                 return null;
             }
@@ -181,8 +211,8 @@ public class AuthenticateService : IAuthenticateService
         SecurityTokenDescriptor securityTokenDescriptor = new SecurityTokenDescriptor();
         securityTokenDescriptor.Subject = new ClaimsIdentity(new Claim[]
         {
-        new Claim(ClaimTypes.Name, account.EMail),
-        new Claim(ClaimTypes.NameIdentifier, account.AccountId.ToString())
+            new Claim(ClaimTypes.Name, account.EMail),
+            new Claim(ClaimTypes.NameIdentifier, account.AccountId.ToString())
         });
         securityTokenDescriptor.Expires = DateTime.UtcNow.AddMinutes(15);
         securityTokenDescriptor.SigningCredentials =
