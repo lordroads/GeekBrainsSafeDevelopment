@@ -1,5 +1,6 @@
 using CardStorageService.Data;
 using CardStorageService.Models;
+using CardStorageService.Providers;
 using CardStorageService.Services;
 using CardStorageService.Services.Impl;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -19,6 +20,15 @@ namespace CardStorageService
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            #region Configure Settings Files
+
+            builder.Configuration
+                .AddJsonFile("appsettings.json")
+                .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true)
+                .Add(new CacheSource(builder.Environment));
+
+            #endregion
 
             #region Logger
 
@@ -70,7 +80,7 @@ namespace CardStorageService
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(AuthenticateService.SecretKey)),
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(builder.Configuration["SECRET_KEY"])),
                         ValidateIssuer = false,
                         ValidateAudience = false,
                         ClockSkew = TimeSpan.Zero
@@ -122,7 +132,7 @@ namespace CardStorageService
 
 
             var app = builder.Build();
-            if (app.Environment.IsDevelopment())
+            if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Local"))
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();

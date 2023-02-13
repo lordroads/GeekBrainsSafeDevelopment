@@ -11,7 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Remove="secret.dev.json" />
+    <Content Remove="secret.Development.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,13 +37,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="secret.dev.json">
+    <None Include="secret.Development.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="secret.dev">
+    <None Update="secret.Development">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -5,8 +5,10 @@ using CardStorageService.Models;
 using CardStorageService.Models.Dto;
 using CardStorageService.Models.Requests;
 using CardStorageService.Models.Responses;
+using CardStorageService.Providers;
+using CardStorageService.Utils;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using MyNamespace;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -15,13 +17,14 @@ namespace CardStorageService.Services.Impl;
 
 public class AuthenticateService : IAuthenticateService
 {
-    public static string SecretKey = CacheProvider.GetFromCache(AppEnvironments.dev)["SECRET_KEY"];
     private readonly Dictionary<string, SessionDto> _sessions = new Dictionary<string, SessionDto>();
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly IConfiguration _configuration;
 
-    public AuthenticateService(IServiceScopeFactory serviceScopeFactory)
+    public AuthenticateService(IServiceScopeFactory serviceScopeFactory, IConfiguration configuration)
     {
         _serviceScopeFactory = serviceScopeFactory;
+        _configuration = configuration;
     }
 
     public AuthenticationResponse Login(AuthenticationRequest authenticationRequest)
@@ -39,7 +42,7 @@ public class AuthenticateService : IAuthenticateService
             };
         }
 
-        if (!PasswordUtil.VerifyPassword(authenticationRequest.Password, account.PasswordSalt, account.PasswordHash))
+        if (!PasswordUtil.VerifyPassword(authenticationRequest.Password, account.PasswordSalt, account.PasswordHash, _configuration["SECRET_KEY"]))
         {
             return new AuthenticationResponse { Status = AuthenticationStatus.InvalidPassword };
         }
@@ -143,7 +146,7 @@ public class AuthenticateService : IAuthenticateService
 
         if (account is null)
         {
-            var dataPassword = PasswordUtil.CreatePasswordHash(authenticationRequest.Password);
+            var dataPassword = PasswordUtil.CreatePasswordHash(authenticationRequest.Password, _configuration["SECRET_KEY"]);
 
             account = new Account
             {
@@ -205,7 +208,7 @@ public class AuthenticateService : IAuthenticateService
     private string CreateSessionToken(Account account)
     {
         JwtSecurityTokenHandler jwtSecurityTokenHandler = new JwtSecurityTokenHandler();
-        byte[] key = Encoding.ASCII.GetBytes(SecretKey);
+        byte[] key = Encoding.ASCII.GetBytes(_configuration["SECRET_KEY"]);
 
         SecurityTokenDescriptor securityTokenDescriptor = new SecurityTokenDescriptor();
         securityTokenDescriptor.Subject = new ClaimsIdentity(new Claim[]
