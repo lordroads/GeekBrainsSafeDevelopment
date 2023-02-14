@@ -65,7 +65,7 @@ namespace CardStorageService.Data.Migrations
 
                     b.HasKey("AccountId");
 
-                    b.ToTable("Accounts");
+                    b.ToTable("Accounts", (string)null);
                 });
 
             modelBuilder.Entity("CardStorageService.Data.Models.AccountSession", b =>
@@ -100,7 +100,7 @@ namespace CardStorageService.Data.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("AccountSessions");
+                    b.ToTable("AccountSessions", (string)null);
                 });
 
             modelBuilder.Entity("CardStorageService.Data.Models.Card", b =>
@@ -132,7 +132,7 @@ namespace CardStorageService.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("Cards");
+                    b.ToTable("Cards", (string)null);
                 });
 
             modelBuilder.Entity("CardStorageService.Data.Models.Client", b =>
@@ -157,7 +157,7 @@ namespace CardStorageService.Data.Migrations
 
                     b.HasKey("ClientId");
 
-                    b.ToTable("Clients");
+                    b.ToTable("Clients", (string)null);
                 });
 
             modelBuilder.Entity("CardStorageService.Data.Models.AccountSession", b =>

@@ -1,13 +1,11 @@
-using CardStorageService.CryptographiApp;
+using AutoMapper;
 using CardStorageService.Data;
 using CardStorageService.Data.Models;
 using CardStorageService.Models;
 using CardStorageService.Models.Dto;
 using CardStorageService.Models.Requests;
 using CardStorageService.Models.Responses;
-using CardStorageService.Providers;
 using CardStorageService.Utils;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -20,11 +18,13 @@ public class AuthenticateService : IAuthenticateService
     private readonly Dictionary<string, SessionDto> _sessions = new Dictionary<string, SessionDto>();
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IConfiguration _configuration;
+    private readonly IMapper _mapper;
 
-    public AuthenticateService(IServiceScopeFactory serviceScopeFactory, IConfiguration configuration)
+    public AuthenticateService(IServiceScopeFactory serviceScopeFactory, IConfiguration configuration, IMapper mapper)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _configuration = configuration;
+        _mapper = mapper;
     }
 
     public AuthenticationResponse Login(AuthenticationRequest authenticationRequest)
@@ -73,11 +73,16 @@ public class AuthenticateService : IAuthenticateService
         };
     }
 
-    public bool Logout(string sessionToken)
+    public AuthenticationResponse Logout(string sessionToken)
     {
         if (string.IsNullOrEmpty(sessionToken))
         {
-            return false;
+            return new AuthenticationResponse 
+            { 
+                Status = AuthenticationStatus.Failure,
+                Message = "Token is null or empty"
+            };
+
         }
 
         lock (_sessions)
@@ -88,22 +93,30 @@ public class AuthenticateService : IAuthenticateService
         using IServiceScope scope = _serviceScopeFactory.CreateScope();
         CardStorageServiceDbContext context = scope.ServiceProvider.GetRequiredService<CardStorageServiceDbContext>();
 
-        AccountSession session = context.AccountSessions.FirstOrDefault(item => item.SessionToken == sessionToken);
+        AccountSession accountSession = context.AccountSessions.FirstOrDefault(item => item.SessionToken == sessionToken);
 
-        if (session is null)
+        if (accountSession is null)
         {
-            return true;
+            return new AuthenticationResponse
+            {
+                Status = AuthenticationStatus.Success,
+                Message = "Token is not exist in database."
+            };
         }
 
-        session.IsClosed = true;
+        accountSession.IsClosed = true;
 
-        context.AccountSessions.Update(session);
+        context.AccountSessions.Update(accountSession);
         context.SaveChanges();
 
-        return true;
+        return new AuthenticationResponse
+        {
+            Status = AuthenticationStatus.Success,
+            Message = "Session is closed."
+        };
     }
 
-    public SessionDto GetSession(string sessionToken)
+    public AuthenticationResponse GetSession(string sessionToken)
     {
         SessionDto sessionDto;
 
@@ -121,7 +134,12 @@ public class AuthenticateService : IAuthenticateService
 
             if (session == null || session.IsClosed)
             {
-                return null;
+                return new AuthenticationResponse 
+                {
+                    Status = AuthenticationStatus.Failure,
+                    Message = "Session is null or closed."
+                };
+
             }
 
             Account account = context.Accounts.FirstOrDefault(account => account.AccountId == session.AccountId);
@@ -134,7 +152,11 @@ public class AuthenticateService : IAuthenticateService
             }
         }
 
-        return sessionDto;
+        return new AuthenticationResponse 
+        {
+            Status = AuthenticationStatus.Success,
+            Session = sessionDto
+        };
     }
 
     public AuthenticationResponse Registration(AuthenticationRequest authenticationRequest)
@@ -226,20 +248,9 @@ public class AuthenticateService : IAuthenticateService
 
     private SessionDto GetSessionDto(Account account, AccountSession accountSession)
     {
-        return new SessionDto
-        {
-            SessionId = accountSession.SessionId,
-            SessionToken = accountSession.SessionToken,
-            Account = new AccountDto
-            {
-                AccountId = account.AccountId,
-                EMail = account.EMail,
-                FirstName = account.FirstName,
-                LastName = account.LastName,
-                SecondName = account.SecondName,
-                Locked = account.Locked
-            }
-        };
+        accountSession.Account = account;
+
+        return _mapper.Map<SessionDto>(accountSession);
     }
 
     #endregion

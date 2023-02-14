@@ -8,6 +8,6 @@ public interface IAuthenticateService
 {
     AuthenticationResponse Login(AuthenticationRequest authenticationRequest);
     AuthenticationResponse Registration(AuthenticationRequest authenticationRequest);
-    bool Logout(string token);
-    SessionDto GetSession(string sessionToken);
+    AuthenticationResponse Logout(string token);
+    AuthenticationResponse GetSession(string sessionToken);
 }

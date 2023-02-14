@@ -1,11 +1,12 @@
+using AutoMapper;
 using CardStorageService.Data.Models;
 using CardStorageService.Models.Dto;
 using CardStorageService.Models.Requests;
 using CardStorageService.Models.Responses;
 using CardStorageService.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace CardStorageService.Controllers;
 
@@ -16,11 +17,19 @@ public class CardController : Controller
 {
     private readonly ILogger<CardController> _logger;
     private readonly ICardRepositoryService _cardRepositoryService;
+    private readonly IValidator<CreateCardRequest> _validator;
+    private readonly IMapper _mapper;
 
-    public CardController(ILogger<CardController> logger, ICardRepositoryService cardRepositoryService)
+    public CardController(
+        ILogger<CardController> logger,
+        ICardRepositoryService cardRepositoryService,
+        IValidator<CreateCardRequest> validator,
+        IMapper mapper)
     {
         _logger = logger;
         _cardRepositoryService = cardRepositoryService;
+        _validator = validator;
+        _mapper = mapper;
     }
 
     [HttpPost("create"),
@@ -29,13 +38,18 @@ public class CardController : Controller
     {
         try
         {
-            var cardId = _cardRepositoryService.Create(new Card
+            var validationResult = _validator.Validate(request);
+
+            if (!validationResult.IsValid)
             {
-                ClientId = request.ClientId,
-                CardNo = request.CardNo,
-                ExpDate = request.ExpDate,
-                CVV2 = request.CVV2
-            });
+                return Ok(new CreateCardResponse
+                {
+                    ErrorCode = 1014,
+                    ErrorMessage = validationResult.ToDictionary()
+                });
+            }
+
+            var cardId = _cardRepositoryService.Create(_mapper.Map<Card>(request));
 
             return Ok(new CreateCardResponse
             {
@@ -48,7 +62,7 @@ public class CardController : Controller
             return Ok(new CreateCardResponse
             {
                 ErrorCode = 1012,
-                ErrorMessage = "Create card error."
+                ErrorMessage = $"Create card error. Owner message: {exception.Message}"
             });
         }
     }
@@ -63,13 +77,7 @@ public class CardController : Controller
 
             return Ok(new GetCardsResponse
             {
-                Cards = cards.Select(card => new CardDto
-                {
-                    CardNo = card.CardNo,
-                    CVV2 = card.CVV2,
-                    Name = card.Name,
-                    ExpDate = card.ExpDate.ToString("MM/yy"),
-                }).ToList()
+                Cards = _mapper.Map<IList<CardDto>>(cards)
             });
         }
         catch (Exception exception)
@@ -78,7 +86,7 @@ public class CardController : Controller
             return Ok(new GetCardsResponse
             {
                 ErrorCode = 1013,
-                ErrorMessage = "Get cards error."
+                ErrorMessage = $"Get cards error. Owner message: {exception.Message}"
             });
         }
     }

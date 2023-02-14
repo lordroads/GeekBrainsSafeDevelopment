@@ -1,8 +1,13 @@
+using AutoMapper;
 using CardStorageService.Data;
+using CardStorageService.Mappings;
 using CardStorageService.Models;
+using CardStorageService.Models.Requests;
+using CardStorageService.Models.Validators;
 using CardStorageService.Providers;
 using CardStorageService.Services;
 using CardStorageService.Services.Impl;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.EntityFrameworkCore;
@@ -21,12 +26,33 @@ namespace CardStorageService
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            #region Configure Settings Files
+            #region Configure AutoMapper
+
+            var mapperConfiguration = new MapperConfiguration(mapper => mapper.AddProfile(new MappingsProfile()));
+            var mapper = mapperConfiguration.CreateMapper();
+            builder.Services.AddSingleton(mapper);
+
+            #endregion
+
+            #region Configure FluentValidations
+
+            builder.Services.AddScoped<IValidator<AuthenticationRequest>, AuthenticationRequestValidation>();
+            builder.Services.AddScoped<IValidator<CreateClientRequest>, CreateClientRequestValidation>();
+            builder.Services.AddScoped<IValidator<CreateCardRequest>, CreateCardRequestValidation>();
+
+            #endregion
+
+            #region Configure Settings Files and Options
 
             builder.Configuration
                 .AddJsonFile("appsettings.json")
                 .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true)
                 .Add(new CacheSource(builder.Environment));
+
+            builder.Services.Configure<DatabaseOptions>(options =>
+            {
+                builder.Configuration.GetSection("Settings:DatabaseOptions").Bind(options);
+            });
 
             #endregion
 

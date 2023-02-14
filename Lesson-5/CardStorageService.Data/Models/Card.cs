@@ -23,5 +23,7 @@ public class Card
 
     [Column]
     public DateTime ExpDate { get; set; }
+
+
     public virtual Client Client { get; set; }
 }

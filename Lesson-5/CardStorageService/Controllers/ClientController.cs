@@ -1,7 +1,9 @@
+using AutoMapper;
 using CardStorageService.Data.Models;
 using CardStorageService.Models.Requests;
 using CardStorageService.Models.Responses;
 using CardStorageService.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,11 +16,19 @@ public class ClientController : Controller
 {
     private readonly IClientRepositoryService _clientRepositoryService;
     private readonly ILogger<ClientController> _logger;
+    private readonly IValidator<CreateClientRequest> _validator;
+    private readonly IMapper _mapper;
 
-    public ClientController(ILogger<ClientController> logger, IClientRepositoryService clientRepositoryService)
+    public ClientController(
+        ILogger<ClientController> logger,
+        IClientRepositoryService clientRepositoryService,
+        IValidator<CreateClientRequest> validator,
+        IMapper mapper)
     {
         _logger = logger;
         _clientRepositoryService = clientRepositoryService;
+        _validator = validator;
+        _mapper = mapper;
     }
 
     [HttpPost("create"),
@@ -27,12 +37,18 @@ public class ClientController : Controller
     {
         try
         {
-            var clientId = _clientRepositoryService.Create(new Client
+            var validationResult = _validator.Validate(request);
+
+            if (!validationResult.IsValid)
             {
-                FirstName = request.FirstName,
-                Surname = request.Surname,
-                Patronymic = request.Patronymic
-            });
+                return Ok(new CreateCardResponse
+                {
+                    ErrorCode = 914,
+                    ErrorMessage = validationResult.ToDictionary()
+                });
+            }
+
+            var clientId = _clientRepositoryService.Create(_mapper.Map<Client>(request));
 
             return Ok(new CreateClientResponse
             {
@@ -45,7 +61,7 @@ public class ClientController : Controller
             return Ok(new CreateClientResponse
             {
                 ErrorCode = 912,
-                ErrorMessage = "Create client error."
+                ErrorMessage = $"Create client error. Owner message: {exception.Message}"
             });
         }
     }

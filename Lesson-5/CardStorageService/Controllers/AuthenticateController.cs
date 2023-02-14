@@ -7,21 +7,38 @@ using Microsoft.AspNetCore.Mvc;
 using CardStorageService.Models.Dto;
 using Microsoft.Net.Http.Headers;
 using System.Net.Http.Headers;
+using FluentValidation;
 
 namespace CardStorageService.Controllers;
 
 public class AuthenticateController : Controller
 {
     private readonly IAuthenticateService _authenticateService;
+    private readonly IValidator<AuthenticationRequest> _validator;
 
-    public AuthenticateController(IAuthenticateService authenticateService)
+    public AuthenticateController(
+        IAuthenticateService authenticateService, 
+        IValidator<AuthenticationRequest> validator)
     {
         _authenticateService = authenticateService;
+        _validator = validator;
     }
 
     [HttpPost("login"), AllowAnonymous]
     public IActionResult Login([FromBody] AuthenticationRequest authenticationRequest)
     {
+        var validationResult = _validator.Validate(authenticationRequest);
+
+        if (!validationResult.IsValid) 
+        {
+            return Ok(new AuthenticationResponse()
+            {
+                Status = AuthenticationStatus.Failure,
+                Message = validationResult.ToDictionary()
+            });
+        }
+
+
         AuthenticationResponse authenticationResponse = _authenticateService.Login(authenticationRequest);
 
         if (authenticationResponse.Status == AuthenticationStatus.Success)
@@ -35,6 +52,17 @@ public class AuthenticateController : Controller
     [HttpPost("registration"), AllowAnonymous]
     public IActionResult Registration([FromBody] AuthenticationRequest authenticationRequest)
     {
+        var validationResult = _validator.Validate(authenticationRequest);
+
+        if (!validationResult.IsValid)
+        {
+            return Ok(new AuthenticationResponse()
+            {
+                Status = AuthenticationStatus.Failure,
+                Message = validationResult.ToDictionary()
+            });
+        }
+
         AuthenticationResponse authenticationResponse = _authenticateService.Registration(authenticationRequest);
 
         if (authenticationResponse.Status == AuthenticationStatus.Success)
@@ -59,20 +87,23 @@ public class AuthenticateController : Controller
 
             if (string.IsNullOrEmpty(sessionToken))
             {
-                return Unauthorized();
+                return Ok(new AuthenticationResponse
+                {
+                    Status = AuthenticationStatus.Failure,
+                    Message = "Token is null or empty."
+                });
             }
 
-            SessionDto sessionDto = _authenticateService.GetSession(sessionToken);
+            var response = _authenticateService.GetSession(sessionToken);
 
-            if (sessionDto == null)
-            {
-                return Unauthorized();
-            }
-
-            return Ok(sessionDto);
+            return Ok(response);
         }
 
-        return Unauthorized();
+        return Ok(new AuthenticationResponse
+        {
+            Status = AuthenticationStatus.Failure,
+            Message = "Not found authorization header."
+        });
     }
 
     [HttpPost("logout")]
@@ -82,13 +113,19 @@ public class AuthenticateController : Controller
 
         var result = AuthenticationHeaderValue.TryParse(authorizationHeader, out var authorizationValue);
 
-        if (result)
+        if (!result)
         {
-            var sessionToken = authorizationValue.Parameter;
-
-            _authenticateService.Logout(sessionToken);
+            return Ok(new AuthenticationResponse
+            {
+                Status = AuthenticationStatus.Failure,
+                Message = "Not found authorization header."
+            });
         }
 
-        return Ok(result);
+        var sessionToken = authorizationValue.Parameter;
+
+        var response = _authenticateService.Logout(sessionToken);
+
+        return Ok(response);
     }
 }
