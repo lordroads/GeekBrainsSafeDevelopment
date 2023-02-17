@@ -32,6 +32,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.17.0" />
+    <PackageReference Include="MongoDB.Driver" Version="2.19.0" />
     <PackageReference Include="NLog" Version="5.1.1" />
     <PackageReference Include="NLog.Web.AspNetCore" Version="5.2.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
@@ -43,6 +44,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Models\MongoModels\" />
     <Folder Include="Models\Requests\" />
     <Folder Include="Services\Impl\Grpc\" />
   </ItemGroup>
@@ -58,6 +60,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="secret.Local">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="secret.Development">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

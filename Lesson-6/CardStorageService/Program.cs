@@ -36,7 +36,7 @@ namespace CardStorageService
             //    });
             //});
 
-            builder.Services.AddGrpc();
+            //builder.Services.AddGrpc();
 
             #endregion
 
@@ -68,6 +68,11 @@ namespace CardStorageService
             builder.Services.Configure<DatabaseOptions>(options =>
             {
                 builder.Configuration.GetSection("Settings:DatabaseOptions").Bind(options);
+            });
+
+            builder.Services.Configure<MongoOptions>(options =>
+            {
+                builder.Configuration.GetSection("Settings:MongoOptions").Bind(options);
             });
 
             #endregion
@@ -105,6 +110,7 @@ namespace CardStorageService
 
             builder.Services.AddScoped<ICardRepositoryService, CardRepository>();
             builder.Services.AddScoped<IClientRepositoryService, ClientRepository>();
+            builder.Services.AddScoped<IBookRepository, BookRepository>();
 
             #endregion
 
@@ -192,11 +198,11 @@ namespace CardStorageService
                     builder.UseHttpLogging();
                 });
 
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapGrpcService<ClientService>();
-                endpoints.MapGrpcService<CardService>();
-            });
+            //app.UseEndpoints(endpoints =>
+            //{
+            //    endpoints.MapGrpcService<ClientService>();
+            //    endpoints.MapGrpcService<CardService>();
+            //});
 
             app.MapControllers();
 
