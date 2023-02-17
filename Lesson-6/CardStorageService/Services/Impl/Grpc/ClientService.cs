@@ -1,39 +1,30 @@
 using AutoMapper;
+using CardStorageService.Controllers;
 using CardStorageService.Data.Models;
-using CardStorageService.Models.Requests;
-using CardStorageService.Models.Responses;
-using CardStorageService.Services;
+using CardStorageServiceProtos;
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using Grpc.Core;
+using static CardStorageServiceProtos.CliectService;
+using CreateClientResponse = CardStorageServiceProtos.CreateClientResponse;
 
-namespace CardStorageService.Controllers;
+namespace CardStorageService.Services.Impl.Grpc;
 
-[Authorize]
-[ApiController]
-[Route("api/[controller]")]
-public class ClientController : Controller
+public class ClientService : CliectServiceBase
 {
     private readonly IClientRepositoryService _clientRepositoryService;
     private readonly ILogger<ClientController> _logger;
     private readonly IValidator<CreateClientRequest> _validator;
     private readonly IMapper _mapper;
 
-    public ClientController(
-        ILogger<ClientController> logger,
-        IClientRepositoryService clientRepositoryService,
-        IValidator<CreateClientRequest> validator,
-        IMapper mapper)
+    public ClientService(IClientRepositoryService clientRepositoryService, ILogger<ClientController> logger, IValidator<CreateClientRequest> validator, IMapper mapper)
     {
-        _logger = logger;
         _clientRepositoryService = clientRepositoryService;
+        _logger = logger;
         _validator = validator;
         _mapper = mapper;
     }
 
-    [HttpPost("create"),
-     ProducesResponseType(typeof(CreateClientResponse), StatusCodes.Status200OK)]
-    public IActionResult Create([FromBody] CreateClientRequest request)
+    public override Task<CreateClientResponse> Create(CreateClientRequest request, ServerCallContext context)
     {
         try
         {
@@ -41,16 +32,16 @@ public class ClientController : Controller
 
             if (!validationResult.IsValid)
             {
-                return Ok(new CreateClientResponse
+                return Task.FromResult(new CreateClientResponse
                 {
                     ErrorCode = 914,
-                    ErrorMessage = validationResult.ToDictionary()
+                    ErrorMessage = string.Join('\n', validationResult.ToDictionary())
                 });
             }
 
             var clientId = _clientRepositoryService.Create(_mapper.Map<Client>(request));
 
-            return Ok(new CreateClientResponse
+            return Task.FromResult(new CreateClientResponse
             {
                 ClientId = clientId
             });
@@ -58,7 +49,7 @@ public class ClientController : Controller
         catch (Exception exception)
         {
             _logger.LogError(exception, "Create client error.");
-            return Ok(new CreateClientResponse
+            return Task.FromResult(new CreateClientResponse
             {
                 ErrorCode = 912,
                 ErrorMessage = $"Create client error. Owner message: {exception.Message}"

@@ -1,30 +1,25 @@
 using AutoMapper;
+using CardStorageService.Controllers;
 using CardStorageService.Data.Models;
-using CardStorageService.Models.Dto;
-using CardStorageService.Models.Requests;
-using CardStorageService.Models.Responses;
 using CardStorageService.Services;
+using CardStorageServiceProtos;
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using Grpc.Core;
+using static CardStorageServiceProtos.CardService;
+using GetCardsResponse = CardStorageServiceProtos.GetCardsResponse;
+using CreateCardRequest = CardStorageServiceProtos.CreateCardRequest;
+using CreateCardResponse = CardStorageServiceProtos.CreateCardResponse;
 
-namespace CardStorageService.Controllers;
+namespace CardStorageService.Services.Impl.Grpc;
 
-[Authorize]
-[ApiController]
-[Route("api/[controller]")]
-public class CardController : Controller
+public class CardService : CardServiceBase
 {
     private readonly ILogger<CardController> _logger;
     private readonly ICardRepositoryService _cardRepositoryService;
     private readonly IValidator<CreateCardRequest> _validator;
     private readonly IMapper _mapper;
 
-    public CardController(
-        ILogger<CardController> logger,
-        ICardRepositoryService cardRepositoryService,
-        IValidator<CreateCardRequest> validator,
-        IMapper mapper)
+    public CardService(ILogger<CardController> logger, ICardRepositoryService cardRepositoryService, IValidator<CreateCardRequest> validator, IMapper mapper)
     {
         _logger = logger;
         _cardRepositoryService = cardRepositoryService;
@@ -32,9 +27,7 @@ public class CardController : Controller
         _mapper = mapper;
     }
 
-    [HttpPost("create"),
-     ProducesResponseType(typeof(CreateCardResponse), StatusCodes.Status200OK)]
-    public IActionResult Create([FromBody] CreateCardRequest request)
+    public override Task<CreateCardResponse> Create(CreateCardRequest request, ServerCallContext context)
     {
         try
         {
@@ -42,16 +35,16 @@ public class CardController : Controller
 
             if (!validationResult.IsValid)
             {
-                return Ok(new CreateCardResponse
+                return Task.FromResult(new CreateCardResponse
                 {
                     ErrorCode = 1014,
-                    ErrorMessage = validationResult.ToDictionary()
+                    ErrorMessage = string.Join('\n', validationResult.ToDictionary())
                 });
             }
 
             var cardId = _cardRepositoryService.Create(_mapper.Map<Card>(request));
 
-            return Ok(new CreateCardResponse
+            return Task.FromResult(new CreateCardResponse
             {
                 CardId = cardId.ToString()
             });
@@ -59,7 +52,7 @@ public class CardController : Controller
         catch (Exception exception)
         {
             _logger.LogError(exception, "Create card error.");
-            return Ok(new CreateCardResponse
+            return Task.FromResult(new CreateCardResponse
             {
                 ErrorCode = 1012,
                 ErrorMessage = $"Create card error. Owner message: {exception.Message}"
@@ -67,23 +60,22 @@ public class CardController : Controller
         }
     }
 
-    [HttpGet("get-by-client-id"),
-     ProducesResponseType(typeof(GetCardsResponse), StatusCodes.Status200OK)]
-    public IActionResult GetByClientId([FromQuery] string clientId)
+    public override Task<GetCardsResponse> GetById(GetCardsRequest request, ServerCallContext context)
     {
         try
         {
-            var cards = _cardRepositoryService.GetByClientId(clientId);
+            var cards = _cardRepositoryService.GetByClientId(request.ClientId);
 
-            return Ok(new GetCardsResponse
-            {
-                Cards = _mapper.Map<IList<CardDto>>(cards)
-            });
+            var response = new GetCardsResponse();
+
+            response.Cards.AddRange(_mapper.Map<IList<CardDto>>(cards));
+
+            return Task.FromResult(response);
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Get cards error.");
-            return Ok(new GetCardsResponse
+            return Task.FromResult(new GetCardsResponse
             {
                 ErrorCode = 1013,
                 ErrorMessage = $"Get cards error. Owner message: {exception.Message}"

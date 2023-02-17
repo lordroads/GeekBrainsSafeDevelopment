@@ -7,12 +7,11 @@ using CardStorageService.Models.Validators;
 using CardStorageService.Providers;
 using CardStorageService.Services;
 using CardStorageService.Services.Impl;
+using CardStorageService.Services.Impl.Grpc;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NLog.Web;
@@ -26,6 +25,21 @@ namespace CardStorageService
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            #region Configure Grpc
+
+            //use appsetting.{Environment}.json file to configuration kestrel server
+            //builder.WebHost.ConfigureKestrel(options =>
+            //{
+            //    options.Listen(IPAddress.Any, 5001, listenOptions =>
+            //    {
+            //        listenOptions.Protocols = HttpProtocols.Http2;
+            //    });
+            //});
+
+            builder.Services.AddGrpc();
+
+            #endregion
+
             #region Configure AutoMapper
 
             var mapperConfiguration = new MapperConfiguration(mapper => mapper.AddProfile(new MappingsProfile()));
@@ -38,7 +52,9 @@ namespace CardStorageService
 
             builder.Services.AddScoped<IValidator<AuthenticationRequest>, AuthenticationRequestValidation>();
             builder.Services.AddScoped<IValidator<CreateClientRequest>, CreateClientRequestValidation>();
+            builder.Services.AddScoped<IValidator<CardStorageServiceProtos.CreateClientRequest>, CreateClientRequestValidationProto>();
             builder.Services.AddScoped<IValidator<CreateCardRequest>, CreateCardRequestValidation>();
+            builder.Services.AddScoped<IValidator<CardStorageServiceProtos.CreateCardRequest>, CreateCardRequestValidationProto>();
 
             #endregion
 
@@ -170,7 +186,17 @@ namespace CardStorageService
             app.UseAuthentication();
             app.UseAuthorization();
 
-            app.UseHttpLogging();
+            app.UseWhen(c => c.Request.ContentType != "application/grpc",
+                builder =>
+                {
+                    builder.UseHttpLogging();
+                });
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapGrpcService<ClientService>();
+                endpoints.MapGrpcService<CardService>();
+            });
 
             app.MapControllers();
 
