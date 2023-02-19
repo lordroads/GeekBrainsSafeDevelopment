@@ -16,11 +16,60 @@ namespace CardStorageService.Controllers
             _bookRepository = bookRepository;
         }
 
+        [HttpGet("search/mongo")]
+        public IActionResult SearchMongo([FromQuery] string text)
+        {
+            return Ok(_bookRepository.FullTextSearchMongo(text));
+        }
+
+        [HttpGet("search/elastic")]
+        public IActionResult SearchElasticPrincipal([FromQuery] string text)
+        {
+            List<Book> result = new List<Book>();
+
+            foreach (var item in text.Split(' '))
+            {
+                if (item is not null)
+                {
+                    var serche = _bookRepository.FullTextSearchElasticPrincipal(item.ToLower());
+
+                    foreach (var s in serche)
+                    {
+                        if (!result.Contains(s))
+                        {
+                            result.Add(s);
+                        }
+                    }
+                }
+            }
+
+            return Ok(result);
+        }
 
         [HttpGet("get-all")]
         public IActionResult GetAll()
         {
             return Ok( _bookRepository.GetAll() );
+        }
+
+        [HttpGet("get-all-words")]
+        public IActionResult GetAllWords()
+        {
+            try
+            {
+                return Ok(_bookRepository.GetAllWords());
+
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
+
+        [HttpGet("get-all-words-to-books")]
+        public IActionResult GetAllWordsToBooks()
+        {
+            return Ok(_bookRepository.GetAllWordsToBooks());
         }
 
         [HttpGet("{id}")]

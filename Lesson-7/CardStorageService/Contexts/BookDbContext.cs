@@ -17,6 +17,22 @@ public class BookDbContext
         }
     }
 
+    public IMongoCollection<Word> Words
+    {
+        get
+        {
+            return _database.GetCollection<Word>("Words");
+        }
+    }
+
+    public IMongoCollection<WordToBook> WordsToBooks
+    {
+        get
+        {
+            return _database.GetCollection<WordToBook>("WordsToBooks");
+        }
+    }
+
     public BookDbContext(IOptions<MongoOptions> mongoOptions)
     {
         if (_database is null)

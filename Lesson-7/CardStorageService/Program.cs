@@ -1,5 +1,6 @@
 using AutoMapper;
 using CardStorageService.Data;
+using CardStorageService.Jobs;
 using CardStorageService.Mappings;
 using CardStorageService.Models;
 using CardStorageService.Models.Requests;
@@ -15,6 +16,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NLog.Web;
+using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
 using System.Text;
 
 namespace CardStorageService
@@ -24,6 +28,18 @@ namespace CardStorageService
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            #region Jobs
+
+            builder.Services.AddHostedService<QuartzHostedService>();
+
+            builder.Services.AddSingleton<IJobFactory, SingletonJobFactory>();
+            builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+
+            builder.Services.AddSingleton<IndexJob>();
+            builder.Services.AddSingleton(new JobSchedule(jobType: typeof(IndexJob), cronExpression: "0/30 * * * * ?"));
+
+            #endregion
 
             #region Configure Grpc
 
