@@ -1,3 +1,5 @@
+#undef GRPC
+#undef CONSUL
 using AutoMapper;
 using CardStorageService.Data;
 using CardStorageService.Jobs;
@@ -8,7 +10,7 @@ using CardStorageService.Models.Validators;
 using CardStorageService.Providers;
 using CardStorageService.Services;
 using CardStorageService.Services.Impl;
-using CardStorageService.Services.Impl.Grpc;
+using Consul;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpLogging;
@@ -29,7 +31,20 @@ namespace CardStorageService
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            #region Jobs
+#region Confogure Consul
+#if CONSUL
+            builder.Services.AddHealthChecks();
+            builder.Services.AddSingleton<IHostedService, ConsulHostedService>();
+            builder.Services.Configure<ConsulConfig>(builder.Configuration.GetSection("ConsulConfig"));
+            builder.Services.AddSingleton<IConsulClient, ConsulClient>(p => new ConsulClient(consulConfig =>
+            {
+                var address = builder.Configuration["ConsulConfig:Address"];
+                consulConfig.Address = new Uri(address);
+            }));
+#endif
+#endregion
+
+#region Jobs
 
             builder.Services.AddHostedService<QuartzHostedService>();
 
@@ -39,32 +54,32 @@ namespace CardStorageService
             builder.Services.AddSingleton<IndexJob>();
             builder.Services.AddSingleton(new JobSchedule(jobType: typeof(IndexJob), cronExpression: "0/30 * * * * ?"));
 
-            #endregion
+#endregion
 
-            #region Configure Grpc
+#region Configure Grpc
+#if GRPC
+            use appsetting.{Environment}.json file to configuration kestrel server
+            builder.WebHost.ConfigureKestrel(options =>
+            {
+                options.Listen(IPAddress.Any, 5001, listenOptions =>
+                {
+                    listenOptions.Protocols = HttpProtocols.Http2;
+                });
+            });
 
-            //use appsetting.{Environment}.json file to configuration kestrel server
-            //builder.WebHost.ConfigureKestrel(options =>
-            //{
-            //    options.Listen(IPAddress.Any, 5001, listenOptions =>
-            //    {
-            //        listenOptions.Protocols = HttpProtocols.Http2;
-            //    });
-            //});
+builder.Services.AddGrpc();
+#endif
+#endregion
 
-            //builder.Services.AddGrpc();
-
-            #endregion
-
-            #region Configure AutoMapper
+#region Configure AutoMapper
 
             var mapperConfiguration = new MapperConfiguration(mapper => mapper.AddProfile(new MappingsProfile()));
             var mapper = mapperConfiguration.CreateMapper();
             builder.Services.AddSingleton(mapper);
 
-            #endregion
+#endregion
 
-            #region Configure FluentValidations
+#region Configure FluentValidations
 
             builder.Services.AddScoped<IValidator<AuthenticationRequest>, AuthenticationRequestValidation>();
             builder.Services.AddScoped<IValidator<CreateClientRequest>, CreateClientRequestValidation>();
@@ -72,9 +87,9 @@ namespace CardStorageService
             builder.Services.AddScoped<IValidator<CreateCardRequest>, CreateCardRequestValidation>();
             builder.Services.AddScoped<IValidator<CardStorageServiceProtos.CreateCardRequest>, CreateCardRequestValidationProto>();
 
-            #endregion
+#endregion
 
-            #region Configure Settings Files and Options
+#region Configure Settings Files and Options
 
             builder.Configuration
                 .AddJsonFile("appsettings.json")
@@ -91,9 +106,9 @@ namespace CardStorageService
                 builder.Configuration.GetSection("Settings:MongoOptions").Bind(options);
             });
 
-            #endregion
+#endregion
 
-            #region Logger
+#region Logger
 
             builder.Services.AddHttpLogging(logging =>
             {
@@ -111,26 +126,26 @@ namespace CardStorageService
                 logging.AddConsole();
             }).UseNLog(new NLogAspNetCoreOptions { RemoveLoggerFactoryFilter = true });
 
-            #endregion
+#endregion
 
-            #region Configure EF DbContext
+#region Configure EF DbContext
 
             builder.Services.AddDbContext<CardStorageServiceDbContext>(options =>
             {
                 options.UseSqlServer(builder.Configuration["Settings:DatabaseOptions:ConnectionString"]);
             });
 
-            #endregion
+#endregion
 
-            #region Congigure Repositories
+#region Congigure Repositories
 
             builder.Services.AddScoped<ICardRepositoryService, CardRepository>();
             builder.Services.AddScoped<IClientRepositoryService, ClientRepository>();
             builder.Services.AddScoped<IBookRepository, BookRepository>();
 
-            #endregion
+#endregion
 
-            #region Configure Authenticate
+#region Configure Authenticate
 
             builder.Services.AddAuthentication(options =>
             {
@@ -153,7 +168,7 @@ namespace CardStorageService
 
             builder.Services.AddSingleton<IAuthenticateService, AuthenticateService>();
 
-            #endregion
+#endregion
 
 
             builder.Services.AddControllers();
@@ -161,7 +176,7 @@ namespace CardStorageService
             builder.Services.AddEndpointsApiExplorer();
 
 
-            #region Configure Swagger
+#region Configure Swagger
 
             builder.Services.AddSwaggerGen(config =>
             {
@@ -192,7 +207,7 @@ namespace CardStorageService
                 });
             });
 
-            #endregion
+#endregion
 
 
             var app = builder.Build();
@@ -202,6 +217,9 @@ namespace CardStorageService
                 app.UseSwaggerUI();
             }
 
+#if CONSUL
+            app.UseHealthChecks("/healthz");
+#endif
             app.UseHttpsRedirection();
             app.UseRouting();
 
@@ -214,11 +232,15 @@ namespace CardStorageService
                     builder.UseHttpLogging();
                 });
 
-            //app.UseEndpoints(endpoints =>
-            //{
-            //    endpoints.MapGrpcService<ClientService>();
-            //    endpoints.MapGrpcService<CardService>();
-            //});
+#if GRPC
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapGrpcService<ClientService>();
+                endpoints.MapGrpcService<CardService>();
+            });
+
+#endif
 
             app.MapControllers();
 
